@@ -22,9 +22,9 @@ needs_sudo() {
 # --- maybe prepend sudo ---
 run() {
     if needs_sudo "$MGR"; then
-        exec "$@"
-    else
         exec sudo "$@"
+    else
+        exec "$@"
     fi
 }
 
