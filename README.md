@@ -29,13 +29,22 @@ pack -s firefox
 # Install a package
 pack -i neovim
 
+# Remove a package
+pack -r neovim
+
+# Show package details
+pack -d neovim
+
+# List installed packages
+pack -l
+
 # Show help
 pack -h
 
-# Force flatpak or snap
-pack --flatpak -s firefox
-pack --flatpak -i org.mozilla.firefox
-pack --snap -s firefox
+# Force a specific manager
+pack -m flatpak -s firefox
+pack -m flatpak -i org.mozilla.firefox
+pack -m apt -i vim
 ```
 
 ## Supported Package Managers
@@ -53,12 +62,7 @@ Auto-detected (first found wins):
 | 7 | `apk`          | no   | Alpine Linux          |
 | 8 | `xbps-install` | yes  | Void Linux            |
 
-Opt-in via flags:
-
-| Flag         | Binary    | sudo |
-|--------------|-----------|------|
-| `--flatpak`  | `flatpak` | no   |
-| `--snap`     | `snap`    | yes  |
+Any manager can be forced with `-m MGR`, including ones not auto-detected like `flatpak` and `snap`.
 
 ## Uninstall
 

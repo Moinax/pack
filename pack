@@ -22,13 +22,13 @@ needs_sudo() {
 # --- maybe prepend sudo ---
 run() {
     if needs_sudo "$MGR"; then
-        exec sudo "$@"
-    else
         exec "$@"
+    else
+        exec sudo "$@"
     fi
 }
 
-# --- run without sudo (search) ---
+# --- run without sudo (search, list, details) ---
 run_plain() {
     exec "$@"
 }
@@ -42,17 +42,22 @@ Usage:
   pack                  update all packages
   pack -s QUERY         search for packages
   pack -i PKG           install a package
+  pack -r PKG           remove a package
+  pack -d PKG           show package details
+  pack -l               list installed packages
   pack -h               show this help
 
-  pack --flatpak ...    force flatpak
-  pack --snap ...       force snap
+  pack -m MGR ...       force a specific manager
+                        e.g. pack -m flatpak -s firefox
 
-Detected managers (first found wins):
+Auto-detected managers (first found wins):
   paru, yay, pacman, apt, dnf, zypper, apk, xbps-install
-
-Extra (opt-in via flag):
-  flatpak, snap
 EOF
+}
+
+# --- require argument helper ---
+require_arg() {
+    [[ -z "${1:-}" ]] && { printf '✗ %s requires an argument\n' "$2" >&2; exit 1; }
 }
 
 # --- parse args ---
@@ -62,28 +67,14 @@ ARG=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -s)
-            ACTION=search
-            [[ -z "${2:-}" ]] && { printf '✗ -s requires a query\n' >&2; exit 1; }
-            ARG="$2"; shift 2
-            ;;
-        -i)
-            ACTION=install
-            [[ -z "${2:-}" ]] && { printf '✗ -i requires a package name\n' >&2; exit 1; }
-            ARG="$2"; shift 2
-            ;;
-        -h|--help)
-            usage; exit 0
-            ;;
-        --flatpak)
-            MGR=flatpak; shift
-            ;;
-        --snap)
-            MGR=snap; shift
-            ;;
-        *)
-            printf '✗ Unknown option: %s\n' "$1" >&2; exit 1
-            ;;
+        -s) ACTION=search;  require_arg "${2:-}" "-s"; ARG="$2"; shift 2 ;;
+        -i) ACTION=install; require_arg "${2:-}" "-i"; ARG="$2"; shift 2 ;;
+        -r) ACTION=remove;  require_arg "${2:-}" "-r"; ARG="$2"; shift 2 ;;
+        -d) ACTION=details; require_arg "${2:-}" "-d"; ARG="$2"; shift 2 ;;
+        -l) ACTION=list; shift ;;
+        -m) require_arg "${2:-}" "-m"; MGR="$2"; shift 2 ;;
+        -h|--help) usage; exit 0 ;;
+        *)  printf '✗ Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
 
@@ -96,6 +87,9 @@ case "$MGR" in
         case "$ACTION" in
             search)  run_plain paru -Ss "$ARG" ;;
             install) run paru -S --noconfirm "$ARG" ;;
+            remove)  run paru -R "$ARG" ;;
+            details) run_plain paru -Si "$ARG" ;;
+            list)    run_plain paru -Q ;;
             update)  run paru -Syu --noconfirm ;;
         esac
         ;;
@@ -103,6 +97,9 @@ case "$MGR" in
         case "$ACTION" in
             search)  run_plain yay -Ss "$ARG" ;;
             install) run yay -S --noconfirm "$ARG" ;;
+            remove)  run yay -R "$ARG" ;;
+            details) run_plain yay -Si "$ARG" ;;
+            list)    run_plain yay -Q ;;
             update)  run yay -Syu --noconfirm ;;
         esac
         ;;
@@ -110,6 +107,9 @@ case "$MGR" in
         case "$ACTION" in
             search)  run_plain pacman -Ss "$ARG" ;;
             install) run pacman -S --noconfirm "$ARG" ;;
+            remove)  run pacman -R "$ARG" ;;
+            details) run_plain pacman -Si "$ARG" ;;
+            list)    run_plain pacman -Q ;;
             update)  run pacman -Syu --noconfirm ;;
         esac
         ;;
@@ -117,6 +117,9 @@ case "$MGR" in
         case "$ACTION" in
             search)  run_plain apt search "$ARG" ;;
             install) run apt install -y "$ARG" ;;
+            remove)  run apt remove -y "$ARG" ;;
+            details) run_plain apt show "$ARG" ;;
+            list)    run_plain apt list --installed ;;
             update)  run apt upgrade -y ;;
         esac
         ;;
@@ -124,6 +127,9 @@ case "$MGR" in
         case "$ACTION" in
             search)  run_plain dnf search "$ARG" ;;
             install) run dnf install -y "$ARG" ;;
+            remove)  run dnf remove -y "$ARG" ;;
+            details) run_plain dnf info "$ARG" ;;
+            list)    run_plain dnf list --installed ;;
             update)  run dnf upgrade -y ;;
         esac
         ;;
@@ -131,6 +137,9 @@ case "$MGR" in
         case "$ACTION" in
             search)  run_plain zypper search "$ARG" ;;
             install) run zypper install -y "$ARG" ;;
+            remove)  run zypper remove -y "$ARG" ;;
+            details) run_plain zypper info "$ARG" ;;
+            list)    run_plain zypper search --installed-only ;;
             update)  run zypper update -y ;;
         esac
         ;;
@@ -138,6 +147,9 @@ case "$MGR" in
         case "$ACTION" in
             search)  run_plain apk search "$ARG" ;;
             install) run apk add "$ARG" ;;
+            remove)  run apk del "$ARG" ;;
+            details) run_plain apk info "$ARG" ;;
+            list)    run_plain apk list --installed ;;
             update)  run apk upgrade ;;
         esac
         ;;
@@ -145,6 +157,9 @@ case "$MGR" in
         case "$ACTION" in
             search)  run_plain xbps-query -Rs "$ARG" ;;
             install) run xbps-install -y "$ARG" ;;
+            remove)  run xbps-remove -y "$ARG" ;;
+            details) run_plain xbps-query -S "$ARG" ;;
+            list)    run_plain xbps-query -l ;;
             update)  run xbps-install -Syu ;;
         esac
         ;;
@@ -152,6 +167,9 @@ case "$MGR" in
         case "$ACTION" in
             search)  run_plain flatpak search "$ARG" ;;
             install) run flatpak install -y "$ARG" ;;
+            remove)  run flatpak uninstall -y "$ARG" ;;
+            details) run_plain flatpak info "$ARG" ;;
+            list)    run_plain flatpak list ;;
             update)  run flatpak update -y ;;
         esac
         ;;
@@ -159,6 +177,9 @@ case "$MGR" in
         case "$ACTION" in
             search)  run_plain snap find "$ARG" ;;
             install) run snap install "$ARG" ;;
+            remove)  run snap remove "$ARG" ;;
+            details) run_plain snap info "$ARG" ;;
+            list)    run_plain snap list ;;
             update)  run snap refresh ;;
         esac
         ;;
