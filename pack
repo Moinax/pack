@@ -39,12 +39,14 @@ usage() {
 pack — universal package manager wrapper
 
 Usage:
-  pack                  update all packages
+  pack                  show this help
   pack -s QUERY         search for packages
   pack -i PKG           install a package
   pack -r PKG           remove a package
   pack -d PKG           show package details
   pack -l               list installed packages
+  pack -u               update all packages
+  pack -c               cleanup orphaned packages
   pack -h               show this help
 
   pack -m MGR ...       force a specific manager
@@ -62,7 +64,7 @@ require_arg() {
 
 # --- parse args ---
 MGR=""
-ACTION="update"
+ACTION="help"
 ARG=""
 
 while [[ $# -gt 0 ]]; do
@@ -72,11 +74,15 @@ while [[ $# -gt 0 ]]; do
         -r) ACTION=remove;  require_arg "${2:-}" "-r"; ARG="$2"; shift 2 ;;
         -d) ACTION=details; require_arg "${2:-}" "-d"; ARG="$2"; shift 2 ;;
         -l) ACTION=list; shift ;;
+        -u) ACTION=update; shift ;;
+        -c) ACTION=cleanup; shift ;;
         -m) require_arg "${2:-}" "-m"; MGR="$2"; shift 2 ;;
-        -h|--help) usage; exit 0 ;;
+        -h|--help) ACTION=help; shift ;;
         *)  printf '✗ Unknown option: %s\n' "$1" >&2; exit 1 ;;
     esac
 done
+
+[[ "$ACTION" == "help" ]] && { usage; exit 0; }
 
 [[ -z "$MGR" ]] && MGR=$(detect)
 [[ -z "$MGR" ]] && { printf '✗ No package manager found\n' >&2; exit 1; }
@@ -91,6 +97,14 @@ case "$MGR" in
             details) run_plain paru -Si "$ARG" ;;
             list)    run_plain paru -Q ;;
             update)  run paru -Syu --noconfirm ;;
+            cleanup)
+                orphans=$(paru -Qdtq 2>/dev/null) || true
+                if [[ -n "$orphans" ]]; then
+                    echo "$orphans" | paru -Rns -
+                else
+                    printf 'No orphaned packages found\n'
+                fi
+                ;;
         esac
         ;;
     yay)
@@ -101,6 +115,14 @@ case "$MGR" in
             details) run_plain yay -Si "$ARG" ;;
             list)    run_plain yay -Q ;;
             update)  run yay -Syu --noconfirm ;;
+            cleanup)
+                orphans=$(yay -Qdtq 2>/dev/null) || true
+                if [[ -n "$orphans" ]]; then
+                    echo "$orphans" | yay -Rns -
+                else
+                    printf 'No orphaned packages found\n'
+                fi
+                ;;
         esac
         ;;
     pacman)
@@ -111,6 +133,14 @@ case "$MGR" in
             details) run_plain pacman -Si "$ARG" ;;
             list)    run_plain pacman -Q ;;
             update)  run pacman -Syu --noconfirm ;;
+            cleanup)
+                orphans=$(pacman -Qdtq 2>/dev/null) || true
+                if [[ -n "$orphans" ]]; then
+                    echo "$orphans" | sudo pacman -Rns -
+                else
+                    printf 'No orphaned packages found\n'
+                fi
+                ;;
         esac
         ;;
     apt)
@@ -121,6 +151,7 @@ case "$MGR" in
             details) run_plain apt show "$ARG" ;;
             list)    run_plain apt list --installed ;;
             update)  run apt upgrade -y ;;
+            cleanup) run apt autoremove -y ;;
         esac
         ;;
     dnf)
@@ -131,6 +162,7 @@ case "$MGR" in
             details) run_plain dnf info "$ARG" ;;
             list)    run_plain dnf list --installed ;;
             update)  run dnf upgrade -y ;;
+            cleanup) run dnf autoremove -y ;;
         esac
         ;;
     zypper)
@@ -141,6 +173,7 @@ case "$MGR" in
             details) run_plain zypper info "$ARG" ;;
             list)    run_plain zypper search --installed-only ;;
             update)  run zypper update -y ;;
+            cleanup) run_plain zypper packages --orphaned ;;
         esac
         ;;
     apk)
@@ -151,6 +184,7 @@ case "$MGR" in
             details) run_plain apk info "$ARG" ;;
             list)    run_plain apk list --installed ;;
             update)  run apk upgrade ;;
+            cleanup) printf 'Cleanup is not supported for %s\n' "$MGR" ;;
         esac
         ;;
     xbps-install)
@@ -161,6 +195,7 @@ case "$MGR" in
             details) run_plain xbps-query -S "$ARG" ;;
             list)    run_plain xbps-query -l ;;
             update)  run xbps-install -Syu ;;
+            cleanup) run xbps-remove -oy ;;
         esac
         ;;
     flatpak)
@@ -171,6 +206,7 @@ case "$MGR" in
             details) run_plain flatpak info "$ARG" ;;
             list)    run_plain flatpak list ;;
             update)  run flatpak update -y ;;
+            cleanup) run flatpak uninstall --unused -y ;;
         esac
         ;;
     snap)
@@ -181,6 +217,7 @@ case "$MGR" in
             details) run_plain snap info "$ARG" ;;
             list)    run_plain snap list ;;
             update)  run snap refresh ;;
+            cleanup) printf 'Cleanup is not supported for %s\n' "$MGR" ;;
         esac
         ;;
     *)

@@ -20,7 +20,7 @@ sudo make install PREFIX=/usr/local
 ## Usage
 
 ```bash
-# Update all packages
+# Show help
 pack
 
 # Search for a package
@@ -37,6 +37,12 @@ pack -d neovim
 
 # List installed packages
 pack -l
+
+# Update all packages
+pack -u
+
+# Cleanup orphaned packages
+pack -c
 
 # Show help
 pack -h

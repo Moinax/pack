@@ -9,7 +9,7 @@
 The script (`pack`) is ~180 lines of Bash:
 
 1. **`detect()`** — iterates a priority list of binaries, returns the first found
-2. **Arg parsing** — `while/case` loop handles `-s`, `-i`, `-r`, `-d`, `-l`, `-m MGR`, `-h`
+2. **Arg parsing** — `while/case` loop handles `-s`, `-i`, `-r`, `-d`, `-l`, `-u`, `-c`, `-m MGR`, `-h`
 3. **`needs_sudo()`** — returns whether a manager needs sudo for install/update/remove
 4. **`run()` / `run_plain()`** — `exec` wrappers; `run` prepends `sudo` when needed, `run_plain` never does (search, list, details)
 5. **Dispatch** — nested `case` block: outer on manager, inner on action
@@ -32,12 +32,14 @@ Any manager (including flatpak, snap) can be forced with `-m MGR`.
 ## CLI
 
 ```
-pack                  → update all packages
+pack                  → show help
 pack -s QUERY         → search
 pack -i PKG           → install
 pack -r PKG           → remove
 pack -d PKG           → package details
 pack -l               → list installed packages
+pack -u               → update all packages
+pack -c               → cleanup orphaned packages
 pack -m MGR ...       → force a specific manager
 pack -h               → help
 ```
@@ -65,6 +67,8 @@ sudo make install PREFIX=/usr/local
 ./pack -r neovim
 ./pack -d neovim
 ./pack -l
+./pack -u
+./pack -c
 ./pack
 
 # Uninstall
