@@ -59,7 +59,10 @@ EOF
 
 # --- require argument helper ---
 require_arg() {
-    [[ -z "${1:-}" ]] && { printf '✗ %s requires an argument\n' "$2" >&2; exit 1; }
+    if [[ -z "${1:-}" ]]; then
+        printf '✗ %s requires an argument\n' "$2" >&2
+        exit 1
+    fi
 }
 
 # --- parse args ---
