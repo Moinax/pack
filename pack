@@ -1,0 +1,168 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# pack — universal package manager wrapper
+# Detects the system package manager and execs the right command.
+
+# --- detect best system manager ---
+detect() {
+    for c in paru yay pacman apt dnf zypper apk xbps-install; do
+        command -v "$c" &>/dev/null && echo "$c" && return
+    done
+}
+
+# --- needs sudo? ---
+needs_sudo() {
+    case "$1" in
+        paru|yay|apk|flatpak) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+# --- maybe prepend sudo ---
+run() {
+    if needs_sudo "$MGR"; then
+        exec sudo "$@"
+    else
+        exec "$@"
+    fi
+}
+
+# --- run without sudo (search) ---
+run_plain() {
+    exec "$@"
+}
+
+# --- usage ---
+usage() {
+    cat <<'EOF'
+pack — universal package manager wrapper
+
+Usage:
+  pack                  update all packages
+  pack -s QUERY         search for packages
+  pack -i PKG           install a package
+  pack -h               show this help
+
+  pack --flatpak ...    force flatpak
+  pack --snap ...       force snap
+
+Detected managers (first found wins):
+  paru, yay, pacman, apt, dnf, zypper, apk, xbps-install
+
+Extra (opt-in via flag):
+  flatpak, snap
+EOF
+}
+
+# --- parse args ---
+MGR=""
+ACTION="update"
+ARG=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -s)
+            ACTION=search
+            [[ -z "${2:-}" ]] && { printf '✗ -s requires a query\n' >&2; exit 1; }
+            ARG="$2"; shift 2
+            ;;
+        -i)
+            ACTION=install
+            [[ -z "${2:-}" ]] && { printf '✗ -i requires a package name\n' >&2; exit 1; }
+            ARG="$2"; shift 2
+            ;;
+        -h|--help)
+            usage; exit 0
+            ;;
+        --flatpak)
+            MGR=flatpak; shift
+            ;;
+        --snap)
+            MGR=snap; shift
+            ;;
+        *)
+            printf '✗ Unknown option: %s\n' "$1" >&2; exit 1
+            ;;
+    esac
+done
+
+[[ -z "$MGR" ]] && MGR=$(detect)
+[[ -z "$MGR" ]] && { printf '✗ No package manager found\n' >&2; exit 1; }
+
+# --- dispatch ---
+case "$MGR" in
+    paru)
+        case "$ACTION" in
+            search)  run_plain paru -Ss "$ARG" ;;
+            install) run paru -S --noconfirm "$ARG" ;;
+            update)  run paru -Syu --noconfirm ;;
+        esac
+        ;;
+    yay)
+        case "$ACTION" in
+            search)  run_plain yay -Ss "$ARG" ;;
+            install) run yay -S --noconfirm "$ARG" ;;
+            update)  run yay -Syu --noconfirm ;;
+        esac
+        ;;
+    pacman)
+        case "$ACTION" in
+            search)  run_plain pacman -Ss "$ARG" ;;
+            install) run pacman -S --noconfirm "$ARG" ;;
+            update)  run pacman -Syu --noconfirm ;;
+        esac
+        ;;
+    apt)
+        case "$ACTION" in
+            search)  run_plain apt search "$ARG" ;;
+            install) run apt install -y "$ARG" ;;
+            update)  run apt upgrade -y ;;
+        esac
+        ;;
+    dnf)
+        case "$ACTION" in
+            search)  run_plain dnf search "$ARG" ;;
+            install) run dnf install -y "$ARG" ;;
+            update)  run dnf upgrade -y ;;
+        esac
+        ;;
+    zypper)
+        case "$ACTION" in
+            search)  run_plain zypper search "$ARG" ;;
+            install) run zypper install -y "$ARG" ;;
+            update)  run zypper update -y ;;
+        esac
+        ;;
+    apk)
+        case "$ACTION" in
+            search)  run_plain apk search "$ARG" ;;
+            install) run apk add "$ARG" ;;
+            update)  run apk upgrade ;;
+        esac
+        ;;
+    xbps-install)
+        case "$ACTION" in
+            search)  run_plain xbps-query -Rs "$ARG" ;;
+            install) run xbps-install -y "$ARG" ;;
+            update)  run xbps-install -Syu ;;
+        esac
+        ;;
+    flatpak)
+        case "$ACTION" in
+            search)  run_plain flatpak search "$ARG" ;;
+            install) run flatpak install -y "$ARG" ;;
+            update)  run flatpak update -y ;;
+        esac
+        ;;
+    snap)
+        case "$ACTION" in
+            search)  run_plain snap find "$ARG" ;;
+            install) run snap install "$ARG" ;;
+            update)  run snap refresh ;;
+        esac
+        ;;
+    *)
+        printf '✗ Unsupported manager: %s\n' "$MGR" >&2; exit 1
+        ;;
+esac
