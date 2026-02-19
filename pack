@@ -22,15 +22,15 @@ needs_sudo() {
 # --- maybe prepend sudo ---
 run() {
     if needs_sudo "$MGR"; then
-        exec sudo "$@"
+        sudo "$@"
     else
-        exec "$@"
+        "$@"
     fi
 }
 
 # --- run without sudo (search, list, details) ---
 run_plain() {
-    exec "$@"
+    "$@"
 }
 
 # --- usage ---
@@ -86,6 +86,9 @@ done
 
 [[ -z "$MGR" ]] && MGR=$(detect)
 [[ -z "$MGR" ]] && { printf '✗ No package manager found\n' >&2; exit 1; }
+
+printf '▶ %s — %s\n' "$MGR" "$ACTION" >&2
+trap 'rc=$?; if [[ $rc -eq 0 ]]; then printf "✓ %s — done\n" "$MGR" >&2; else printf "✗ %s — failed (exit %d)\n" "$MGR" "$rc" >&2; fi; exit $rc' EXIT
 
 # --- dispatch ---
 case "$MGR" in
