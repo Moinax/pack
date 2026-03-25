@@ -45,7 +45,8 @@ Usage:
   pack -r PKG           remove a package
   pack -d PKG           show package details
   pack -l               list installed packages
-  pack -u               update all packages
+  pack -u               update all packages (asks for confirmation)
+  pack -f -u            update all packages (skip confirmation)
   pack -c               cleanup orphaned packages
   pack -h               show this help
 
@@ -69,6 +70,7 @@ require_arg() {
 MGR=""
 ACTION="help"
 ARG=""
+FORCE=false
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -79,6 +81,7 @@ while [[ $# -gt 0 ]]; do
         -l) ACTION=list; shift ;;
         -u) ACTION=update; shift ;;
         -c) ACTION=cleanup; shift ;;
+        -f) FORCE=true; shift ;;
         -m) require_arg "${2:-}" "-m"; MGR="$2"; shift 2 ;;
         -h|--help) ACTION=help; shift ;;
         *)  printf '✗ Unknown option: %s\n' "$1" >&2; exit 1 ;;
@@ -93,6 +96,15 @@ done
 printf '▶ %s — %s\n' "$MGR" "$ACTION" >&2
 trap 'rc=$?; if [[ $rc -eq 0 ]]; then printf "✓ %s — done\n" "$MGR" >&2; else printf "✗ %s — failed (exit %d)\n" "$MGR" "$rc" >&2; fi; exit $rc' EXIT
 
+# --- set force flag per manager family ---
+FFLAG=""
+if [[ "$FORCE" == true ]]; then
+    case "$MGR" in
+        paru|yay|pacman) FFLAG="--noconfirm" ;;
+        apt|dnf|zypper|flatpak) FFLAG="-y" ;;
+    esac
+fi
+
 # --- dispatch ---
 case "$MGR" in
     paru)
@@ -102,7 +114,7 @@ case "$MGR" in
             remove)  run paru -R "$ARG" ;;
             details) run_plain paru -Si "$ARG" ;;
             list)    run_plain paru -Q ;;
-            update)  run paru -Syu --noconfirm ;;
+            update)  run paru -Syu $FFLAG ;;
             cleanup)
                 orphans=$(paru -Qdtq 2>/dev/null) || true
                 if [[ -n "$orphans" ]]; then
@@ -120,7 +132,7 @@ case "$MGR" in
             remove)  run yay -R "$ARG" ;;
             details) run_plain yay -Si "$ARG" ;;
             list)    run_plain yay -Q ;;
-            update)  run yay -Syu --noconfirm ;;
+            update)  run yay -Syu $FFLAG ;;
             cleanup)
                 orphans=$(yay -Qdtq 2>/dev/null) || true
                 if [[ -n "$orphans" ]]; then
@@ -138,7 +150,7 @@ case "$MGR" in
             remove)  run pacman -R "$ARG" ;;
             details) run_plain pacman -Si "$ARG" ;;
             list)    run_plain pacman -Q ;;
-            update)  run pacman -Syu --noconfirm ;;
+            update)  run pacman -Syu $FFLAG ;;
             cleanup)
                 orphans=$(pacman -Qdtq 2>/dev/null) || true
                 if [[ -n "$orphans" ]]; then
@@ -156,7 +168,7 @@ case "$MGR" in
             remove)  run apt remove -y "$ARG" ;;
             details) run_plain apt show "$ARG" ;;
             list)    run_plain apt list --installed ;;
-            update)  run apt upgrade -y ;;
+            update)  run apt upgrade $FFLAG ;;
             cleanup) run apt autoremove -y ;;
         esac
         ;;
@@ -167,7 +179,7 @@ case "$MGR" in
             remove)  run dnf remove -y "$ARG" ;;
             details) run_plain dnf info "$ARG" ;;
             list)    run_plain dnf list --installed ;;
-            update)  run dnf upgrade -y ;;
+            update)  run dnf upgrade $FFLAG ;;
             cleanup) run dnf autoremove -y ;;
         esac
         ;;
@@ -178,7 +190,7 @@ case "$MGR" in
             remove)  run zypper remove -y "$ARG" ;;
             details) run_plain zypper info "$ARG" ;;
             list)    run_plain zypper search --installed-only ;;
-            update)  run zypper update -y ;;
+            update)  run zypper update $FFLAG ;;
             cleanup) run_plain zypper packages --orphaned ;;
         esac
         ;;
@@ -211,7 +223,7 @@ case "$MGR" in
             remove)  run flatpak uninstall -y "$ARG" ;;
             details) run_plain flatpak info "$ARG" ;;
             list)    run_plain flatpak list ;;
-            update)  run flatpak update -y ;;
+            update)  run flatpak update $FFLAG ;;
             cleanup) run flatpak uninstall --unused -y ;;
         esac
         ;;
