@@ -38,8 +38,11 @@ pack -d neovim
 # List installed packages
 pack -l
 
-# Update all packages
+# Update all packages (asks for confirmation)
 pack -u
+
+# Update all packages (skip confirmation)
+pack -f -u
 
 # Cleanup orphaned packages
 pack -c
